@@ -1,104 +1,143 @@
 
-#  Basketball AI: Detect, Track, and Identify Players
 
-This project is a complete computer vision pipeline to analyze basketball game footage. It uses a series of advanced AI models to automatically detect players, track their movement, segment them from the background, cluster them into teams, and read their jersey numbers to identify them by name.
+````markdown
+# 🏀 Basketball Analysis - Google Colab Version  
 
-This implementation is based on the [Roboflow Basketball AI Notebook](https://colab.research.google.com/github/roboflow/notebooks/blob/main/notebooks/basketball-ai-how-to-detect-track-and-identify-basketball-players.ipynb).
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/YOUR_USERNAME/YOUR_REPOSITORY/blob/main/basketball-ai-how-to-detect-track-and-identify-basketball-players.ipynb)
-*(Note: You'll need to update the Colab badge link to point to your own repository after you upload it.)*
-
-## 🎥 Final Result
-
-![Demo GIF of basketball player tracking and identification]([Insert-Your-Demo.gif])
-*(**Important:** Replace this line with a GIF of your final output video!)*
+> **A full basketball game analysis system powered by YOLOv8 and OpenCV**  
+> Based on: [abdullahtarek/basketball_analysis](https://github.com/abdullahtarek/basketball_analysis)
 
 ---
 
-## ✨ Core Features
+## ✨ Overview  
 
-* **Player Detection:** Identifies all players on the court in a given frame.
-* **High-Fidelity Tracking:** Tracks each detected player's movement across the entire video, even in complex scenes.
-* **Unsupervised Team Clustering:** Automatically groups players into two teams based on their jersey colors without needing pre-labeled team data.
-* **Jersey Number Recognition:** Uses a specialized Vision Language Model (VLM) to read the numbers off player jerseys.
-* **Player Identification:** Matches the validated jersey number and team to a provided roster to identify each player by name.
+This project provides a **complete Google Colab implementation** of a basketball analysis system using **YOLO models**.  
+It performs automatic player tracking, ball tracking, team color classification, and ball possession analysis — producing an annotated video showing all key metrics.  
 
 ---
 
-## 🛠️ Tech Stack & AI Pipeline
+## 🎯 Features  
 
-This project combines several state-of-the-art models:
-
-1.  **Player/Number Detection:** A fine-tuned **RF-DETR** model from Roboflow is used to detect `player` and `number` classes.
-2.  **Player Tracking:** **SAM2.1 (Segment Anything Model 2.1)** is used for high-accuracy, real-time segmentation and tracking.
-3.  **Team Clustering:** An unsupervised approach using:
-    * **SigLIP:** To generate powerful image embeddings for player crops.
-    * **KMeans:** To cluster those embeddings into two distinct teams.
-4.  **Number Recognition:** A fine-tuned **SmolVLM2**, a specialized VLM, acts as an OCR model to read the jersey numbers from cropped images.
-5.  **Core Libraries:** `supervision` for annotations and video processing, `roboflow-inference`, `torch`, and `google-colab`.
-
----
-
-## 🚀 How to Run
-
-This project is designed to be run in a Google Colab notebook.
-
-### 1. Prerequisites
-
-You will need API keys from two services:
-
-* **Roboflow API Key:** To download the detection and recognition models.
-    * Get it here: [app.roboflow.com/settings/api](https://app.roboflow.com/settings/api)
-* **Hugging Face Token:** To download the SigLIP model for team clustering.
-    * Get it here: [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-
-### 2. Colab Setup
-
-1.  **Open the Notebook:** Click the "Open in Colab" badge at the top of this README.
-2.  **Set GPU Runtime:** In Colab, go to **Runtime** -> **Change runtime type** and select **T4 GPU** or **L4 GPU**.
-3.  **Configure Secrets:**
-    * In the Colab sidebar, click the **Secrets (🔑)** tab.
-    * Create a new secret named `HF_TOKEN` and paste your Hugging Face Token as the value.
-    * Create another secret named `ROBOFLOW_API_KEY` and paste your Roboflow API Key.
-4.  **Run All Cells:** Run the cells sequentially from top to bottom.
+| Feature | Description |
+|----------|-------------|
+| 👥 **Player Detection & Tracking** | Detect and track multiple players across frames using YOLOv8 |
+| 🏀 **Ball Tracking** | Track basketball position and motion throughout the video |
+| 👕 **Team Assignment** | Automatically classify players into teams using K-Means clustering on jersey colors |
+| 🎯 **Court Detection (Basic)** | Identify court boundaries for perspective analysis (can be extended) |
+| 🤝 **Pass Detection (Planned)** | Detect passes and interceptions between players |
+| 📊 **Ball Possession** | Determine which player has the ball and track team possession time |
+| 🎥 **Visual Overlays** | Annotated video output showing players, teams, ball, and possession stats |
 
 ---
 
-## ⚙️ How It Works: The Pipeline Explained
+## 🧠 Tech Stack  
 
-The project runs in several distinct stages:
+- **Python 3.10+**
+- **Google Colab (with GPU support)**
+- **YOLOv8 (Ultralytics)**
+- **OpenCV**
+- **Scikit-Learn**
+- **Pandas**
+- **Supervision**
+- **Transformers**
 
-### Step 1: Team Clustering (Unsupervised)
-
-Before processing the video, the system first builds a team classifier.
-1.  It samples player crops from all available source videos.
-2.  It uses **SigLIP** to generate vector embeddings for each player crop.
-3.  **KMeans** clustering is applied to these embeddings to separate them into two groups (Team 0 and Team 1) based on visual similarity (i.e., jersey color).
-4.  You manually map these cluster IDs (0 and 1) to the correct team names (e.g., "Boston Celtics" and "New York Knicks").
-
-### Step 2: Initialization (First Frame)
-
-The main pipeline is initialized on the *first frame* of the target video.
-1.  **RF-DETR** detects all players.
-2.  The team classifier from Step 1 assigns each player to a team.
-3.  These initial player bounding boxes are fed as prompts to the **SAM2.1** tracker to begin tracking each player.
-
-### Step 3: Track, Detect, and Recognize (Video Loop)
-
-For every subsequent frame in the video:
-1.  **SAM2.1** tracks the players, generating a precise segmentation mask for each one.
-2.  For efficiency, number recognition runs every 5 frames:
-    * **RF-DETR** detects all jersey numbers visible in the frame.
-    * **SmolVLM2** reads the text (the number) from each detected number box.
-    * A **Mask IoS (Intersection over Smaller)** metric is used to match the detected numbers to their corresponding player masks.
-3.  A `PropertyValidator` class collects these number readings. A player's number is only considered "validated" after it has been read *identically* for 3 consecutive detections, filtering out errors.
-
-### Step 4: Final Annotation
-
-The final video is generated by drawing the validated data onto each frame.
-* The **SAM2.1** mask is used to color-code the player based on their team.
-* A label is added showing the validated jersey number and the corresponding player's name, pulled from the `TEAM_ROSTERS` dictionary.
+---
 
 
-* This project is based on the **Basketball AI** notebook created by [Roboflow](https://roboflow.com/).
-* Models and code for [SAM2.1](https://github.com/Gy920/segment-anything-2-real-time) are used for tracking.
+### **4️⃣–12️⃣ Utility Functions, Classes & Main Pipeline**
+
+Copy all the remaining cells from the project:
+
+* Video utilities
+* Bounding box helpers
+* `PlayerTracker` class
+* `BallTracker` class
+* `TeamAssigner` class
+* `BallPossessionAssigner` class
+* Drawing utilities
+* Main pipeline
+* Annotation and saving functions
+
+---
+
+## 🚀 How to Run the Project
+
+1. Open **Google Colab** → [https://colab.research.google.com](https://colab.research.google.com)
+2. Enable GPU:
+
+   * Go to **Runtime → Change runtime type → Hardware accelerator → GPU**
+3. Copy and paste all 12 code sections (cells) in order
+4. Upload your basketball video when prompted
+5. Run all cells sequentially
+6. Wait for processing (10–20 minutes for a 30-second clip)
+7. Watch the **annotated output video** directly inside Colab
+
+---
+
+## 📊 Output Features
+
+✅ Player bounding boxes with unique IDs
+✅ Automatic team color detection
+✅ Ball tracking and interpolation
+✅ Possession visualization (triangles and overlays)
+✅ Team possession percentage on video
+✅ Reusable `.pkl` detection files for faster reruns
+
+---
+
+## ⚡ Performance Tips
+
+| Setting                  | Description                                                      |
+| ------------------------ | ---------------------------------------------------------------- |
+| **GPU**                  | Enable GPU runtime for faster processing                         |
+| **Short videos**         | Use 10–30 second clips for testing                               |
+| **Confidence threshold** | Adjust `conf=0.15` in `BallTracker` for sensitivity              |
+| **Possession distance**  | Change `max_player_ball_distance=70` in `BallPossessionAssigner` |
+| **Frame rate**           | Modify `fps=24` in `save_video()` if needed                      |
+| **Stub files**           | Set `read_from_stub=True` to skip re-detection                   |
+
+---
+
+## 📦 Output Example
+
+The final output is:
+
+* `output_basketball_analysis.mp4` – Annotated game video
+* `player_detections.pkl` – Saved player detection data
+* `ball_detections.pkl` – Saved ball detection data
+
+---
+
+## 🧩 Project Structure
+
+```
+basketball_analysis_colab/
+│
+├── 🧾 README.md
+├── 🏀 output_basketball_analysis.mp4
+├── 📦 player_detections.pkl
+├── 📦 ball_detections.pkl
+└── 📓 basketball_analysis_colab.ipynb
+```
+
+---
+
+## 🧠 Future Enhancements
+
+* 🔹 Add **pass detection** and interception logic
+* 🔹 Implement **court keypoint detection** for perspective correction
+* 🔹 Calculate **player speed, distance, and heatmaps**
+* 🔹 Export detailed stats as **CSV or JSON**
+
+---
+
+
+---
+
+⭐ **If you find this project helpful, please give it a star on GitHub!** ⭐
+
+```
+
+---
+
+Would you like me to make this **README include example screenshots / sample output video preview (Markdown embeds)** for GitHub display? I can add a section like “📸 Sample Output” with image/video placeholders for better presentation.
+```
